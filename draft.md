@@ -1,6 +1,6 @@
 # Dockerizing Flask with Postgres, Gunicorn, and Traefik
 
-In this tutorial, we'll look at how to set up Flask with Postgres, and Docker. For production environments, we'll add on Gunicorn, Traefik, and Let's Encrypt.
+In this tutorial, we'll look at how to set up Flask with Postgres and Docker. For production environments, we'll add on Gunicorn, Traefik, and Let's Encrypt.
 
 ## Project Setup
 
@@ -10,6 +10,7 @@ Start by creating a project directory:
 $ mkdir flask-docker-traefik && cd flask-docker-traefik
 $ python3.9 -m venv venv
 $ source venv/bin/activate
+(venv)$
 ```
 
 > Feel free to swap out virtualenv and Pip for [Poetry](https://python-poetry.org/) or [Pipenv](https://pipenv.pypa.io/). For more, review [Modern Python Environments](https://testdriven.io/blog/python-environments/).
@@ -23,19 +24,30 @@ Then, create the following files and folders:
 └── requirements.txt
 ```
 
+TODO: can you update the project structure to:
+
+```bash
+└── services
+    └── web
+        ├── manage.py
+        ├── project
+        │   └── __init__.py
+        └── requirements.txt
+```
+
 Add [Flask](https://flask.palletsprojects.com/en/2.0.x/) to _requirements.txt_:
 
 ```text
 Flask==2.0.1
 ```
 
-Install the packages:
+Install the package:
 
 ```bash
 (venv)$ pip install -r requirements.txt
 ```
 
-Next, let's create a simple Flask application in app/main.py:
+Next, let's create a simple Flask application in _app/main.py_:
 
 ```python
 # app/main.py
@@ -57,7 +69,7 @@ Then, to configure the Flask CLI tool to run and manage the app from the command
 
 from flask.cli import FlaskGroup
 
-from main import app
+from app.main import app
 
 cli = FlaskGroup(app)
 
@@ -83,7 +95,7 @@ Navigate to [127.0.0.1:5000](http://127.0.0.1:5000/), you should see:
 }
 ```
 
-Kill the server once done. Exit then remove the virtual environment as well.
+Kill the server once done. Exit from the virtual environment, and remove it as well.
 
 Your project structure should look like:
 
@@ -134,23 +146,20 @@ Next, add a *docker-compose.yml* file to the project root:
 ```yaml
 version: '3.8'
 
-services: 
-    web:
-        build: .
-        command: python ./app/manage.py run -h 0.0.0.0
-        volumes:
-            - .:/app
-        ports:
-            - 5000:5000
-        env_file:
-        - .env.dev
+services:
+  web:
+    build: .
+    command: python ./app/manage.py run -h 0.0.0.0
+    volumes:
+      - .:/app
+    ports:
+      - 5000:5000
+    environment:
+      - FLASK_APP=app/main.py
+      - FLASK_ENV=development
 ```
 
 > Review the [Compose file reference](https://docs.docker.com/compose/compose-file/) for info on how this file works.
-
-Then, create a .env.dev file in the project root to store environment variables for development:
-
-
 
 Build the image:
 
@@ -172,32 +181,36 @@ Navigate to [http://127.0.0.1:5000/](http://127.0.0.1:5000/) to again view the h
 
 To configure Postgres, we need to add a new service to the _docker-compose.yml_ file, set up [Flask-SQLAlchemy](https://flask-sqlalchemy.palletsprojects.com/), and install [Psycopg2](http://initd.org/psycopg/).
 
-First, add a new service called db to _docker-compose.yml_:
+First, add a new service called `db` to _docker-compose.yml_:
 
 ```yaml
 version: '3.8'
 
-services: 
-    web:
-        build: .
-        command: python ./app/manage.py run -h 0.0.0.0
-        volumes:
-            - .:/app
-        ports:
-            - 5000:5000
-        env_file:
-        - .env.dev
-    db:
-        image: postgres:13-alpine
-        volumes: 
-            - postgres_data:/var/lib/postgresql/data/
-        environment: 
-            - POSTGRES_USER=hello_flask
-            - POSTGRES_PASSWORD=hello_flask
-            - POSTGRES_DB=hello_flask_dev
+services:
+  web:
+    build: .
+    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python ./app/manage.py run -h 0.0.0.0'
+    volumes:
+      - .:/app
+    ports:
+      - 5000:5000
+    environment:
+      - FLASK_APP=app/main.py
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev
+    depends_on:
+      - db
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=hello_flask
+      - POSTGRES_PASSWORD=hello_flask
+      - POSTGRES_DB=hello_flask
 
-volumes: 
-    postgres_data:
+volumes:
+  postgres_data:
 ```
 
 To persist the data beyond the life of the container we configured a volume. This config will bind `postgres_data` to the "/var/lib/postgresql/data/" directory in the container.
@@ -206,7 +219,13 @@ We also added an environment key to define a name for the default database and s
 
 > Review the "Environment Variables" section of the [Postgres Docker Hub page](https://hub.docker.com/_/postgres) for more info.
 
-Add a `DATABASE_URL` environment variable to .env.dev as well:
+Take note of the new command in the `web` service:
+
+```
+bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python ./app/manage.py run -h 0.0.0.0'
+```
+
+`while !</dev/tcp/db/5432; do sleep 1` will continue until Postgres is up. Once up, `python ./app/manage.py run -h 0.0.0.0`.
 
 Then, add a new file called _config.py_ to the "app" directory, where we'll define environment-specific [configuration](https://flask.palletsprojects.com/config/) variables:
 
@@ -278,7 +297,7 @@ def read_root():
     return jsonify(users)
 ```
 
-Using the `dataclass` decorator on the database model helps us serialize the database objects. Read more about dataclasses in the [python standard library documentation](https://docs.python.org/3/library/dataclasses.html).
+Using the [dataclass](https://docs.python.org/3/library/dataclasses.html) decorator on the database model helps us serialize the database objects.
 
 Finally, update _manage.py_:
 
@@ -287,7 +306,7 @@ Finally, update _manage.py_:
 
 from flask.cli import FlaskGroup
 
-from main import app, db
+from app.main import app, db
 
 cli = FlaskGroup(app)
 
@@ -345,6 +364,7 @@ hello_flask_dev=# \l
 
 hello_flask_dev=# \c hello_flask_dev
 You are now connected to database "hello_flask_dev" as user "hello_flask".
+
 hello_flask_dev=# \dt
           List of relations
  Schema | Name | Type  |    Owner
@@ -381,89 +401,14 @@ You should see something similar to:
 ]
 ```
 
-Next, add an _entrypoint.sh_ file to the root directory to verify that Postgres is up and healthy before creating the database table and running the Flask development server:
-
-```sh
-#!/bin/sh
-
-if [ "$DATABASE" = "postgres" ]
-then
-    echo "Waiting for postgres..."
-
-    while ! nc -z $SQL_HOST $SQL_PORT; do
-      sleep 0.1
-    done
-
-    echo "PostgreSQL started"
-fi
-
-python app/manage.py create_db
-
-exec "$@"
-```
-
-Take note of the environment variables.
-
-Update the file permissions locally:
-
-```bash
-$ chmod +x entrypoint.sh
-```
-
-Then, update the Dockerfile to install [Netcat](http://netcat.sourceforge.net/), copy over the _entrypoint.sh_ file, and run the file as the Docker [entrypoint](https://docs.docker.com/engine/reference/builder/#entrypoint) command:
-
-```dockerfile
-# Dockerfile
-
-# pull the official docker image
-FROM python:3.9.5-slim
-
-# set work directory
-WORKDIR /app
-
-# set env variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-ENV PYTHONPATH=/app/app
-
-# install system dependencies
-RUN apt-get update && apt-get install -y netcat
-
-# install dependencies
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-# copy project
-COPY . .
-
-ENTRYPOINT [ "/app/entrypoint.sh" ]
-```
-
-Add the `SQL_HOST`, `SQL_PORT`, and `DATABASE` environment variables, for the _entrypoint.sh_ script, to _.env.dev_:
-
-```text
-FLASK_APP=app/main.py
-FLASK_ENV=development
-DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev
-SQL_HOST=db
-SQL_PORT=5432
-DATABASE=postgres
-```
-
-Test it out again:
-
-1. Re-build the images
-1. Run the containers
-1. Try [http://127.0.0.1:5000](http://127.0.0.1:5000)
-
-The sanity check shows an empty list. That's because we haven't populated the `users` table. Let's add a CLI seed command for adding sample `users` to the users table in _manage.py_:
+Navigate to [http://127.0.0.1:5000](http://127.0.0.1:5000). The sanity check shows an empty list. That's because we haven't populated the `users` table. Let's add a CLI seed command for adding sample `users` to the users table in _manage.py_:
 
 ```python
 # app/manage.py
 
 from flask.cli import FlaskGroup
 
-from main import User, app, db
+from app.main import User, app, db
 
 cli = FlaskGroup(app)
 
@@ -492,18 +437,18 @@ Try it out:
 $ docker-compose exec web python app/manage.py seed_db
 ```
 
-Navigate to [http://127.0.0.1:5000](http://127.0.0.1:5000), you should see:
+Navigate to [http://127.0.0.1:5000](http://127.0.0.1:5000) again. You should now see:
 
 ```json
 [
   {
-    "active": true, 
-    "email": "michael@mherman.org", 
+    "active": true,
+    "email": "michael@mherman.org",
     "id": 1
-  }, 
+  },
   {
-    "active": true, 
-    "email": "test@example.com", 
+    "active": true,
+    "email": "test@example.com",
     "id": 2
   }
 ]
@@ -530,19 +475,23 @@ version: '3.8'
 services:
   web:
     build: .
-    command: gunicorn --bind 0.0.0.0:5000 manage:app
+    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; gunicorn --bind 0.0.0.0:5000 app.manage:app'
     ports:
       - 5000:5000
-    env_file:
-      - ./.env.prod
+    environment:
+      - FLASK_APP=app/main.py
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
     depends_on:
       - db
   db:
     image: postgres:13-alpine
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data/
-    env_file:
-      - ./.env.prod.db
+    environment:
+      - POSTGRES_USER=hello_flask
+      - POSTGRES_PASSWORD=hello_flask
+      - POSTGRES_DB=hello_flask_prod
 
 volumes:
   postgres_data_prod:
@@ -550,28 +499,7 @@ volumes:
 
 > If you have multiple environments, you may want to look at using a [docker-compose.override.yml](https://docs.docker.com/compose/extends/) configuration file. With this approach, you'd add your base config to a _docker-compose.yml_ file and then use a _docker-compose.override.yml_ file to override those config settings based on the environment.
 
-Take note of the default `command`. We're running Gunicorn rather than the Flask development server. We also removed the volume from the `web` service since we don't need it in production. Finally, we're using [separate environment variable files](https://docs.docker.com/compose/env-file/) to define environment variables for both services that will be passed to the container at runtime.
-
-_.env.prod_:
-
-```text
-FLASK_APP=app/main.py
-FLASK_ENV=production
-DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
-SQL_HOST=db
-SQL_PORT=5432
-DATABASE=postgres
-```
-
-_.env.prod.db_:
-
-```text
-POSTGRES_USER=hello_flask
-POSTGRES_PASSWORD=hello_flask
-POSTGRES_DB=hello_flask_prod
-```
-
-Add the two files to the project root. You'll probably want to keep them out of version control, so add them to a .gitignore file.
+Take note of the default `command`. We're running Gunicorn rather than the Flask development server. We also removed the volume from the `web` service since we don't need it in production.
 
 Bring [down](https://docs.docker.com/compose/reference/down/) the development containers (and the associated volumes with the -v flag):
 
@@ -579,32 +507,17 @@ Bring [down](https://docs.docker.com/compose/reference/down/) the development co
 $ docker-compose down -v
 ```
 
-Modify the _entrypoint.sh_ file to run `seed_db`:
-
-```sh
-#!/bin/sh
-
-if [ "$DATABASE" = "postgres" ]
-then
-    echo "Waiting for postgres..."
-
-    while ! nc -z $SQL_HOST $SQL_PORT; do
-      sleep 0.1
-    done
-
-    echo "PostgreSQL started"
-fi
-
-python app/manage.py create_db
-python app/manage.py seed_db
-
-exec "$@"
-```
-
 Then, build the production images and spin up the containers:
 
 ```bash
 $ docker-compose -f docker-compose.prod.yml up -d --build
+```
+
+Create and seed the table:
+
+```bash
+$ docker-compose -f docker-compose.prod.yml exec web python app/manage.py create_db
+$ docker-compose -f docker-compose.prod.yml exec web python app/manage.py seed_db
 ```
 
 Verify that the `hello_flask_prod` database was created along with the `users` table. Test out [http://127.0.0.1:5000/](http://127.0.0.1:5000/).
@@ -773,29 +686,29 @@ Next, update the _docker-compose.yml_ file so that our `web` service is discover
 
 version: '3.8'
 
-services: 
+services:
     web:
         build: .
         command: python ./app/manage.py run -h 0.0.0.0
         volumes:
             - .:/app
-        expose: 
+        expose:
             - 5000
         env_file:
             - .env.dev
-        depends_on: 
+        depends_on:
             - db
-        labels: 
+        labels:
             - "traefik.enable=true"
             - "traefik.http.routers.flask.rule=Host(`flask.localhost`)"
 
     db:
         image: postgres:13-alpine
-        volumes: 
+        volumes:
             - postgres_data:/var/lib/postgresql/data/
-        expose: 
+        expose:
             - 5432
-        environment: 
+        environment:
             - POSTGRES_USER=hello_flask
             - POSTGRES_PASSWORD=hello_flask
             - POSTGRES_DB=hello_flask_dev
@@ -808,7 +721,7 @@ services:
             - "./traefik.dev.toml:/etc/traefik/traefik.toml"
             - "/var/run/docker.sock:/var/run/docker.sock:ro"
 
-volumes: 
+volumes:
     postgres_data:
 ```
 
