@@ -18,15 +18,6 @@ $ source venv/bin/activate
 Then, create the following files and folders:
 
 ```bash
-├── app
-│   ├── __init__.py
-│   └── main.py
-└── requirements.txt
-```
-
-TODO: can you update the project structure to:
-
-```bash
 └── services
     └── web
         ├── manage.py
@@ -47,11 +38,9 @@ Install the package:
 (venv)$ pip install -r requirements.txt
 ```
 
-Next, let's create a simple Flask application in _app/main.py_:
+Next, let's create a simple Flask application in `__init.py__`:
 
 ```python
-# app/main.py
-
 from flask import Flask, jsonify
 
 app = Flask(__name__)
@@ -62,17 +51,14 @@ def read_root():
     return jsonify(hello="world")
 ```
 
-Then, to configure the Flask CLI tool to run and manage the app from the command line, add a _manage.py_ file to the "app" directory:
+Then, to configure the Flask CLI tool to run and manage the app from the command line, add a _manage.py_ file to the "web" directory:
 
 ```python
-# app/manage.py
-
 from flask.cli import FlaskGroup
 
-from app.main import app
+from project import app
 
 cli = FlaskGroup(app)
-
 
 if __name__ == "__main__":
     cli()
@@ -80,10 +66,10 @@ if __name__ == "__main__":
 
 Here, we created a new `FlaskGroup` instance to extend the normal CLI with commands related to the Flask app.
 
-Run the server from the "app" directory:
+Run the server from the "web" directory:
 
 ```bash
-(venv)$ export FLASK_APP=main.py
+(venv)$ export FLASK_APP=project/__init__.py
 (venv)$ python manage.py run
 ```
 
@@ -97,19 +83,9 @@ Navigate to [127.0.0.1:5000](http://127.0.0.1:5000/), you should see:
 
 Kill the server once done. Exit from the virtual environment, and remove it as well.
 
-Your project structure should look like:
-
-```bash
-├── app
-│   ├── __init__.py
-│   ├── main.py
-│   └── manage.py
-└── requirements.txt
-```
-
 ## Docker
 
-Install [Docker](https://docs.docker.com/install/), if you don't already have it, then add a _Dockerfile_ to the project root:
+Install [Docker](https://docs.docker.com/install/), if you don't already have it, then add a _Dockerfile_ to the "web" directory:
 
 ```dockerfile
 # Dockerfile
@@ -146,17 +122,17 @@ Next, add a *docker-compose.yml* file to the project root:
 ```yaml
 version: '3.8'
 
-services:
-  web:
-    build: .
-    command: python ./app/manage.py run -h 0.0.0.0
-    volumes:
-      - .:/app
-    ports:
-      - 5000:5000
-    environment:
-      - FLASK_APP=app/main.py
-      - FLASK_ENV=development
+services: 
+    web:
+        build: ./services/web
+        command: python manage.py run -h 0.0.0.0
+        volumes: 
+            - ./services/web/:/app
+        ports: 
+            - 5000:5000
+        environment: 
+            - FLASK_APP=project/__init__.py
+            - FLASK_ENV=development    
 ```
 
 > Review the [Compose file reference](https://docs.docker.com/compose/compose-file/) for info on how this file works.
@@ -186,31 +162,32 @@ First, add a new service called `db` to _docker-compose.yml_:
 ```yaml
 version: '3.8'
 
-services:
-  web:
-    build: .
-    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python ./app/manage.py run -h 0.0.0.0'
-    volumes:
-      - .:/app
-    ports:
-      - 5000:5000
-    environment:
-      - FLASK_APP=app/main.py
-      - FLASK_ENV=development
-      - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev
-    depends_on:
-      - db
-  db:
-    image: postgres:13-alpine
-    volumes:
-      - postgres_data:/var/lib/postgresql/data/
-    environment:
-      - POSTGRES_USER=hello_flask
-      - POSTGRES_PASSWORD=hello_flask
-      - POSTGRES_DB=hello_flask
+services: 
+    web:
+        build: ./services/web
+        command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python manage.py run -h 0.0.0.0'
+        volumes: 
+            - ./services/web/:/app
+        ports: 
+            - 5000:5000
+        environment: 
+            - FLASK_APP=project/__init__.py
+            - FLASK_ENV=development 
+            - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev   
+        depends_on: 
+            - db
+            
+    db:
+        image: postgres:13-alpine
+        volumes: 
+            - postgres_data:/var/lib/postgresql/data/
+        environment: 
+            - POSTGRES_USER=hello_flask
+            - POSTGRES_PASSWORD=hello_flask
+            - POSTGRES_DB=hello_flask_dev
 
-volumes:
-  postgres_data:
+volumes: 
+    postgres_data:
 ```
 
 To persist the data beyond the life of the container we configured a volume. This config will bind `postgres_data` to the "/var/lib/postgresql/data/" directory in the container.
@@ -222,16 +199,14 @@ We also added an environment key to define a name for the default database and s
 Take note of the new command in the `web` service:
 
 ```
-bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python ./app/manage.py run -h 0.0.0.0'
+bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python manage.py run -h 0.0.0.0'
 ```
 
-`while !</dev/tcp/db/5432; do sleep 1` will continue until Postgres is up. Once up, `python ./app/manage.py run -h 0.0.0.0`.
+`while !</dev/tcp/db/5432; do sleep 1` will continue until Postgres is up. Once up, `python manage.py run -h 0.0.0.0`.
 
-Then, add a new file called _config.py_ to the "app" directory, where we'll define environment-specific [configuration](https://flask.palletsprojects.com/config/) variables:
+Then, add a new file called _config.py_ to the "project" directory, where we'll define environment-specific [configuration](https://flask.palletsprojects.com/config/) variables:
 
 ```python
-# app/config.py
-
 import os
 
 
@@ -242,15 +217,13 @@ class Config(object):
 
 Here, the database is configured based on the `DATABASE_URL` environment variable that we just defined. Take note of the default value.
 
-Update _main.py_ to pull in the config on init:
+Update `__init__.py` to pull in the config on init:
 
 ```python
-# app/main.py
-
 from flask import Flask, jsonify
 
 app = Flask(__name__)
-app.config.from_object("app.config.Config")
+app.config.from_object("project.config.Config")
 
 
 @app.get("/")
@@ -266,18 +239,16 @@ Flask-SQLAlchemy==2.5.1
 psycopg2-binary==2.8.6
 ```
 
-Update _main.py_ again to create a new `SQLAlchemy` instance and define a database model:
+Update `__init__.py` again to create a new `SQLAlchemy` instance and define a database model:
 
 ```python
-# app/main.py
-
 from dataclasses import dataclass
 
 from flask import Flask, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.config.from_object("app.config.Config")
+app.config.from_object("project.config.Config")
 db = SQLAlchemy(app)
 
 
@@ -333,7 +304,7 @@ $ docker-compose up -d --build
 Create the table:
 
 ```bash
-$ docker-compose exec web python app/manage.py create_db
+$ docker-compose exec web python manage.py create_db
 ```
 
 <blockquote>
@@ -404,8 +375,6 @@ You should see something similar to:
 Navigate to [http://127.0.0.1:5000](http://127.0.0.1:5000). The sanity check shows an empty list. That's because we haven't populated the `users` table. Let's add a CLI seed command for adding sample `users` to the users table in _manage.py_:
 
 ```python
-# app/manage.py
-
 from flask.cli import FlaskGroup
 
 from app.main import User, app, db
@@ -434,7 +403,7 @@ if __name__ == "__main__":
 Try it out:
 
 ```bash
-$ docker-compose exec web python app/manage.py seed_db
+$ docker-compose exec web python manage.py seed_db
 ```
 
 Navigate to [http://127.0.0.1:5000](http://127.0.0.1:5000) again. You should now see:
@@ -465,36 +434,92 @@ gunicorn==20.1.0
 psycopg2-binary==2.8.6
 ```
 
-Since we still want to use Flask's built-in server in development, create a new compose file called _docker-compose.prod.yml_ for production:
+Since we still want to use Flask's built-in server in development, create a new compose file in the project root called _docker-compose.prod.yml_ for production:
 
 ```yaml
-# docker-compose.prod.yml
-
 version: '3.8'
 
-services:
-  web:
-    build: .
-    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; gunicorn --bind 0.0.0.0:5000 app.manage:app'
-    ports:
-      - 5000:5000
-    environment:
-      - FLASK_APP=app/main.py
-      - FLASK_ENV=production
-      - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
-    depends_on:
-      - db
-  db:
-    image: postgres:13-alpine
-    volumes:
-      - postgres_data_prod:/var/lib/postgresql/data/
-    environment:
-      - POSTGRES_USER=hello_flask
-      - POSTGRES_PASSWORD=hello_flask
-      - POSTGRES_DB=hello_flask_prod
+services: 
+    web:
+        build: ./services/web
+        command: gunicorn --bind 0.0.0.0:5000 manage:app
+        ports: 
+            - 5000:5000
+        environment: 
+            - FLASK_APP=project/__init__.py
+            - FLASK_ENV=production
+            - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
+        depends_on: 
+            - db
+    db:
+        image: postgres:13-alpine
+        volumes: 
+            - postgres_data_prod:/var/lib/postgresql/data/
+        environment: 
+            - POSTGRES_USER=hello_flask
+            - POSTGRES_PASSWORD=hello_flask
+            - POSTGRES_DB=hello_flask_prod
 
-volumes:
-  postgres_data_prod:
+volumes: 
+    postgres_data_prod:
+```
+
+Create a new _entrypoint.sh_ in web directory that waits for the postgres instance before starting the gunicorn server.
+
+```sh
+#!/bin/sh
+
+echo "Waiting for postgres..."
+
+while ! nc -z db 5432; do
+  sleep 0.1
+done
+
+echo "PostgreSQL started"
+
+python manage.py create_db
+python manage.py seed_db
+
+exec "$@"
+```
+
+The script waits for the postgres connection to be ready. Once the connection is up, it runs the `create_db` and `seed_db` commands.
+
+> Note that the `create_db` command drops all tables. This step is just used for demonstration purposes and not recommended for any real life scenarios.
+
+Update the file permissions locally:
+
+
+
+```bash
+chmod +x services/web/entrypoint.sh
+```
+
+Add the entrypoint to the _Dockerfile_:
+
+```Dockerfile
+# pull the official docker image
+FROM python:3.9.5-slim
+
+# set work directory
+WORKDIR /app
+
+# set env variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+
+# install system dependencies
+RUN apt-get update && apt-get install -y netcat
+
+# install dependencies
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+
+# copy project
+COPY . .
+
+# run entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
 ```
 
 > If you have multiple environments, you may want to look at using a [docker-compose.override.yml](https://docs.docker.com/compose/extends/) configuration file. With this approach, you'd add your base config to a _docker-compose.yml_ file and then use a _docker-compose.override.yml_ file to override those config settings based on the environment.
@@ -513,20 +538,13 @@ Then, build the production images and spin up the containers:
 $ docker-compose -f docker-compose.prod.yml up -d --build
 ```
 
-Create and seed the table:
-
-```bash
-$ docker-compose -f docker-compose.prod.yml exec web python app/manage.py create_db
-$ docker-compose -f docker-compose.prod.yml exec web python app/manage.py seed_db
-```
-
 Verify that the `hello_flask_prod` database was created along with the `users` table. Test out [http://127.0.0.1:5000/](http://127.0.0.1:5000/).
 
 > Again, if the container fails to start, check for errors in the logs via `docker-compose -f docker-compose.prod.yml logs -f`.
 
 ## Production Dockerfile
 
-Create a new Dockerfile called _Dockerfile.prod_ for use with production builds:
+Create a new Dockerfile in the "web " directory called _Dockerfile.prod_ for use with production builds:
 
 ```dockerfile
 ###########
@@ -537,7 +555,7 @@ Create a new Dockerfile called _Dockerfile.prod_ for use with production builds:
 FROM python:3.9.5-slim as builder
 
 # set work directory
-WORKDIR /app
+WORKDIR /usr/src/app
 
 # set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
@@ -574,7 +592,6 @@ RUN addgroup --system app && adduser --system --group app
 # create the appropriate directories
 ENV HOME=/home/app
 ENV APP_HOME=/home/app/web
-ENV PYTHONPATH=$APP_HOME/app
 RUN mkdir $APP_HOME
 WORKDIR $APP_HOME
 
@@ -611,16 +628,18 @@ Update the `web` service within the docker-compose.prod.yml file to build with _
 
 ```yaml
 web:
-    build:
-        context: .
+    build: 
+        context: ./services/web
         dockerfile: Dockerfile.prod
     command: gunicorn --bind 0.0.0.0:5000 manage:app
-    ports:
-      - 5000:5000
-    env_file:
-      - ./.env.prod
-    depends_on:
-      - db
+    ports: 
+        - 5000:5000
+    environment: 
+        - FLASK_APP=project/__init__.py
+        - FLASK_ENV=production
+        - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
+    depends_on: 
+        - db
 ```
 
 Try it out:
@@ -652,11 +671,19 @@ Next, let's add [Traefik](https://traefik.io/traefik/), a [reverse proxy](https:
   1. Slightly [faster](https://doc.traefik.io/traefik/v1.4/benchmarks/) than Traefik
   1. Use Nginx for complex services
 
-Add a new file called *traefik.dev.toml*:
+Add a new folder `traefik` to the services directory. The project structure should look like:
+
+```bash
+├── docker-compose.prod.yml
+├── docker-compose.yml
+└── services
+    ├── traefik
+    └── web
+```
+
+Add a new file called *traefik.dev.toml* to the "traefik" directory:
 
 ```toml
-# docker-compose.yml
-
 # listen on port 80
 [entryPoints]
   [entryPoints.web]
@@ -681,47 +708,45 @@ Here, since we don't want to expose the `db` service, we set [exposedByDefault](
 
 Next, update the _docker-compose.yml_ file so that our `web` service is discovered by Traefik and add a new `traefik` service:
 
-```toml
-# docker-compose.yml
-
+```yml
 version: '3.8'
 
-services:
+services: 
     web:
-        build: .
-        command: python ./app/manage.py run -h 0.0.0.0
-        volumes:
-            - .:/app
-        expose:
-            - 5000
-        env_file:
-            - .env.dev
-        depends_on:
+        build: ./services/web
+        command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python manage.py run -h 0.0.0.0'
+        volumes: 
+            - ./services/web/:/app
+        ports: 
+            - 5000:5000
+        environment: 
+            - FLASK_APP=project/__init__.py
+            - FLASK_ENV=development 
+            - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev   
+        depends_on: 
             - db
-        labels:
+        labels: 
             - "traefik.enable=true"
             - "traefik.http.routers.flask.rule=Host(`flask.localhost`)"
-
+            
     db:
         image: postgres:13-alpine
-        volumes:
+        volumes: 
             - postgres_data:/var/lib/postgresql/data/
-        expose:
-            - 5432
-        environment:
+        environment: 
             - POSTGRES_USER=hello_flask
             - POSTGRES_PASSWORD=hello_flask
             - POSTGRES_DB=hello_flask_dev
-    treafik:
-        image: traefik:v2.2
-        ports:
-            - 80:80
-            - 8081:8080
-        volumes:
-            - "./traefik.dev.toml:/etc/traefik/traefik.toml"
-            - "/var/run/docker.sock:/var/run/docker.sock:ro"
 
-volumes:
+    traefik:
+        image: traefik:v2.2
+        ports: 
+            - 80:80
+        volumes:
+            - "./services/traefik/traefik.dev.toml:/etc/traefik/traefik.toml"
+            - "/var/run/docker.sock:/var/run/docker.sock:ro"        
+
+volumes: 
     postgres_data:
 ```
 
@@ -795,8 +820,6 @@ Assuming you configured a compute instance and set up a free domain, you're now 
 Start by adding a production version of the Traefik config to a file called *traefik.prod.toml*:
 
 ```toml
-# traefik.prod.toml
-
 [entryPoints]
   [entryPoints.web]
     address = ":80"
@@ -857,58 +880,58 @@ Next, assuming you updated your domain name's DNS records, create two new A reco
 Next, update *docker-compose.prod.yml* like so:
 
 ```yaml
-# docker-compose.prod.yml
-
 version: '3.8'
 
-services:
-  web:
-    build:
-        context: .
-        dockerfile: Dockerfile.prod
-    command: gunicorn --bind 0.0.0.0:5000 manage:app
-    expose:
-      - 5000
-    env_file:
-      - ./.env.prod
-    depends_on:
-      - db
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.flask.rule=Host(`flask-traefik.amalshaji.com`)"
-      - "traefik.http.routers.flask.tls=true"
-      - "traefik.http.routers.flask.tls.certresolver=letsencrypt"
-  db:
-    image: postgres:13-alpine
-    volumes:
-      - postgres_data_prod:/var/lib/postgresql/data/
-    expose:
-      - 5432
-    env_file:
-      - ./.env.prod.db
+services: 
+    web:
+        build: 
+            context: ./services/web
+            dockerfile: Dockerfile.prod
+        command: gunicorn --bind 0.0.0.0:5000 manage:app
+        expose: 
+            - 5000
+        environment: 
+            - FLASK_APP=project/__init__.py
+            - FLASK_ENV=production
+            - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
+        depends_on: 
+            - db
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.flask.rule=Host(`flask-traefik.your-domain.com`)"
+            - "traefik.http.routers.flask.tls=true"
+            - "traefik.http.routers.flask.tls.certresolver=letsencrypt"
+    db:
+        image: postgres:13-alpine
+        volumes: 
+            - postgres_data_prod:/var/lib/postgresql/data/
+        environment: 
+            - POSTGRES_USER=hello_flask
+            - POSTGRES_PASSWORD=hello_flask
+            - POSTGRES_DB=hello_flask_prod
 
-  traefik:  # new
-    build:
-      context: .
-      dockerfile: Dockerfile.traefik
-    ports:
-      - 80:80
-      - 443:443
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "./traefik-public-certificates:/certificates"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.dashboard.rule=Host(`dashboard-flask-traefik.amalshaji.com`) && (PathPrefix(`/`)"
-      - "traefik.http.routers.dashboard.tls=true"
-      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.dashboard.service=api@internal"
-      - "traefik.http.routers.dashboard.middlewares=auth"
-      - "traefik.http.middlewares.auth.basicauth.users=testuser:$$apr1$$jIKW.bdS$$eKXe4Lxjgy/rH65wP1iQe1"
+    traefik:
+        build:
+            context: ./services/traefik
+            dockerfile: Dockerfile.traefik
+        ports:
+            - 80:80
+            - 443:443
+        volumes:
+            - "/var/run/docker.sock:/var/run/docker.sock:ro"
+            - "./traefik-public-certificates:/certificates"
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.dashboard.rule=Host(`dashboard-flask-traefik.your-domain.com`) && (PathPrefix(`/`)"
+            - "traefik.http.routers.dashboard.tls=true"
+            - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+            - "traefik.http.routers.dashboard.service=api@internal"
+            - "traefik.http.routers.dashboard.middlewares=auth"
+            - "traefik.http.middlewares.auth.basicauth.users=testuser:$$apr1$$jIKW.bdS$$eKXe4Lxjgy/rH65wP1iQe1"
 
 volumes:
-  postgres_data_prod:
-  traefik-public-certificates:
+    postgres_data_prod:
+    traefik-public-certificates:
 ```
 
 > Again, make sure to replace `your-domain.com` with your actual domain.

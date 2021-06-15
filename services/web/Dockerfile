@@ -7,7 +7,6 @@ WORKDIR /app
 # set env variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
-ENV PYTHONPATH=/app/app
 
 # install system dependencies
 RUN apt-get update && apt-get install -y netcat
@@ -19,4 +18,5 @@ RUN pip install -r requirements.txt
 # copy project
 COPY . .
 
-ENTRYPOINT [ "/app/entrypoint.sh" ]
+# run entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
