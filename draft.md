@@ -32,13 +32,13 @@ Add [Flask](https://flask.palletsprojects.com/en/2.0.x/) to _requirements.txt_:
 Flask==2.0.1
 ```
 
-Install the package:
+Install the package from "services/web":
 
 ```bash
 (venv)$ pip install -r requirements.txt
 ```
 
-Next, let's create a simple Flask application in `__init.py__`:
+Next, let's create a simple Flask application in *\_\_init.py\_\_*:
 
 ```python
 from flask import Flask, jsonify
@@ -51,7 +51,7 @@ def read_root():
     return jsonify(hello="world")
 ```
 
-Then, to configure the Flask CLI tool to run and manage the app from the command line, add a _manage.py_ file to the "web" directory:
+Then, to configure the Flask CLI tool to run and manage the app from the command line, add the following to *services/web/manage.py*:
 
 ```python
 from flask.cli import FlaskGroup
@@ -88,8 +88,6 @@ Kill the server once done. Exit from the virtual environment, and remove it as w
 Install [Docker](https://docs.docker.com/install/), if you don't already have it, then add a _Dockerfile_ to the "web" directory:
 
 ```dockerfile
-# Dockerfile
-
 # pull the official docker image
 FROM python:3.9.5-slim
 
@@ -122,17 +120,17 @@ Next, add a *docker-compose.yml* file to the project root:
 ```yaml
 version: '3.8'
 
-services: 
-    web:
-        build: ./services/web
-        command: python manage.py run -h 0.0.0.0
-        volumes: 
-            - ./services/web/:/app
-        ports: 
-            - 5000:5000
-        environment: 
-            - FLASK_APP=project/__init__.py
-            - FLASK_ENV=development    
+services:
+  web:
+    build: ./services/web
+    command: python manage.py run -h 0.0.0.0
+    volumes:
+      - ./services/web/:/app
+    ports:
+      - 5000:5000
+    environment:
+      - FLASK_APP=project/__init__.py
+      - FLASK_ENV=development
 ```
 
 > Review the [Compose file reference](https://docs.docker.com/compose/compose-file/) for info on how this file works.
@@ -155,39 +153,39 @@ Navigate to [http://127.0.0.1:5000/](http://127.0.0.1:5000/) to again view the h
 
 ## Postgres
 
-To configure Postgres, we need to add a new service to the _docker-compose.yml_ file, set up [Flask-SQLAlchemy](https://flask-sqlalchemy.palletsprojects.com/), and install [Psycopg2](http://initd.org/psycopg/).
+To configure Postgres, we need to add a new service to the *docker-compose.yml* file, set up [Flask-SQLAlchemy](https://flask-sqlalchemy.palletsprojects.com/), and install [Psycopg2](http://initd.org/psycopg/).
 
-First, add a new service called `db` to _docker-compose.yml_:
+First, add a new service called `db` to *docker-compose.yml*:
 
 ```yaml
 version: '3.8'
 
-services: 
-    web:
-        build: ./services/web
-        command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python manage.py run -h 0.0.0.0'
-        volumes: 
-            - ./services/web/:/app
-        ports: 
-            - 5000:5000
-        environment: 
-            - FLASK_APP=project/__init__.py
-            - FLASK_ENV=development 
-            - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev   
-        depends_on: 
-            - db
-            
-    db:
-        image: postgres:13-alpine
-        volumes: 
-            - postgres_data:/var/lib/postgresql/data/
-        environment: 
-            - POSTGRES_USER=hello_flask
-            - POSTGRES_PASSWORD=hello_flask
-            - POSTGRES_DB=hello_flask_dev
+services:
+  web:
+    build: ./services/web
+    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python manage.py run -h 0.0.0.0'
+    volumes:
+      - ./services/web/:/app
+    ports:
+      - 5000:5000
+    environment:
+      - FLASK_APP=project/__init__.py
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev
+    depends_on:
+      - db
 
-volumes: 
-    postgres_data:
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=hello_flask
+      - POSTGRES_PASSWORD=hello_flask
+      - POSTGRES_DB=hello_flask_dev
+
+volumes:
+  postgres_data:
 ```
 
 To persist the data beyond the life of the container we configured a volume. This config will bind `postgres_data` to the "/var/lib/postgresql/data/" directory in the container.
@@ -202,7 +200,7 @@ Take note of the new command in the `web` service:
 bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python manage.py run -h 0.0.0.0'
 ```
 
-`while !</dev/tcp/db/5432; do sleep 1` will continue until Postgres is up. Once up, `python manage.py run -h 0.0.0.0`.
+`while !</dev/tcp/db/5432; do sleep 1` will continue until Postgres is up. Once up, `python manage.py run -h 0.0.0.0` runs.
 
 Then, add a new file called _config.py_ to the "project" directory, where we'll define environment-specific [configuration](https://flask.palletsprojects.com/config/) variables:
 
@@ -217,7 +215,7 @@ class Config(object):
 
 Here, the database is configured based on the `DATABASE_URL` environment variable that we just defined. Take note of the default value.
 
-Update `__init__.py` to pull in the config on init:
+Update *\_\_init\_\_.py* to pull in the config on init:
 
 ```python
 from flask import Flask, jsonify
@@ -239,7 +237,7 @@ Flask-SQLAlchemy==2.5.1
 psycopg2-binary==2.8.6
 ```
 
-Update `__init__.py` again to create a new `SQLAlchemy` instance and define a database model:
+Update *\_\_init\_\_.py* again to create a new `SQLAlchemy` instance and define a database model:
 
 ```python
 from dataclasses import dataclass
@@ -273,11 +271,9 @@ Using the [dataclass](https://docs.python.org/3/library/dataclasses.html) decora
 Finally, update _manage.py_:
 
 ```python
-# app/manage.py
-
 from flask.cli import FlaskGroup
 
-from app.main import app, db
+from project import app, db
 
 cli = FlaskGroup(app)
 
@@ -377,7 +373,7 @@ Navigate to [http://127.0.0.1:5000](http://127.0.0.1:5000). The sanity check sho
 ```python
 from flask.cli import FlaskGroup
 
-from app.main import User, app, db
+from project import User, app, db
 
 cli = FlaskGroup(app)
 
@@ -439,90 +435,32 @@ Since we still want to use Flask's built-in server in development, create a new 
 ```yaml
 version: '3.8'
 
-services: 
-    web:
-        build: ./services/web
-        command: gunicorn --bind 0.0.0.0:5000 manage:app
-        ports: 
-            - 5000:5000
-        environment: 
-            - FLASK_APP=project/__init__.py
-            - FLASK_ENV=production
-            - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
-        depends_on: 
-            - db
-    db:
-        image: postgres:13-alpine
-        volumes: 
-            - postgres_data_prod:/var/lib/postgresql/data/
-        environment: 
-            - POSTGRES_USER=hello_flask
-            - POSTGRES_PASSWORD=hello_flask
-            - POSTGRES_DB=hello_flask_prod
+services:
+  web:
+    build: ./services/web
+    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; gunicorn --bind 0.0.0.0:5000 manage:app'
+    ports:
+      - 5000:5000
+    environment:
+      - FLASK_APP=project/__init__.py
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
+    depends_on:
+      - db
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=hello_flask
+      - POSTGRES_PASSWORD=hello_flask
+      - POSTGRES_DB=hello_flask_prod
 
-volumes: 
-    postgres_data_prod:
+volumes:
+  postgres_data_prod:
 ```
 
-Create a new _entrypoint.sh_ in web directory that waits for the postgres instance before starting the gunicorn server.
-
-```sh
-#!/bin/sh
-
-echo "Waiting for postgres..."
-
-while ! nc -z db 5432; do
-  sleep 0.1
-done
-
-echo "PostgreSQL started"
-
-python manage.py create_db
-python manage.py seed_db
-
-exec "$@"
-```
-
-The script waits for the postgres connection to be ready. Once the connection is up, it runs the `create_db` and `seed_db` commands.
-
-> Note that the `create_db` command drops all tables. This step is just used for demonstration purposes and not recommended for any real life scenarios.
-
-Update the file permissions locally:
-
-
-
-```bash
-chmod +x services/web/entrypoint.sh
-```
-
-Add the entrypoint to the _Dockerfile_:
-
-```Dockerfile
-# pull the official docker image
-FROM python:3.9.5-slim
-
-# set work directory
-WORKDIR /app
-
-# set env variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
-
-# install system dependencies
-RUN apt-get update && apt-get install -y netcat
-
-# install dependencies
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-# copy project
-COPY . .
-
-# run entrypoint.sh
-ENTRYPOINT ["/app/entrypoint.sh"]
-```
-
-> If you have multiple environments, you may want to look at using a [docker-compose.override.yml](https://docs.docker.com/compose/extends/) configuration file. With this approach, you'd add your base config to a _docker-compose.yml_ file and then use a _docker-compose.override.yml_ file to override those config settings based on the environment.
+> If you have multiple environments, you may want to look at using a [docker-compose.override.yml](https://docs.docker.com/compose/extends/) configuration file. With this approach, you'd add your base config to a *docker-compose.yml* file and then use a _docker-compose.override.yml_ file to override those config settings based on the environment.
 
 Take note of the default `command`. We're running Gunicorn rather than the Flask development server. We also removed the volume from the `web` service since we don't need it in production.
 
@@ -536,6 +474,13 @@ Then, build the production images and spin up the containers:
 
 ```bash
 $ docker-compose -f docker-compose.prod.yml up -d --build
+```
+
+Create the table and apply the seed:
+
+```bash
+$ docker-compose -f docker-compose.prod.yml exec web python manage.py create_db
+$ docker-compose -f docker-compose.prod.yml exec web python manage.py seed_db
 ```
 
 Verify that the `hello_flask_prod` database was created along with the `users` table. Test out [http://127.0.0.1:5000/](http://127.0.0.1:5000/).
@@ -602,9 +547,6 @@ COPY --from=builder /usr/src/app/requirements.txt .
 RUN pip install --upgrade pip
 RUN pip install --no-cache /wheels/*
 
-# copy entrypoint.sh
-COPY ./entrypoint.sh $APP_HOME
-
 # copy project
 COPY . $APP_HOME
 
@@ -613,9 +555,6 @@ RUN chown -R app:app $APP_HOME
 
 # change to the app user
 USER app
-
-# run entrypoint.prod.sh
-ENTRYPOINT ["/home/app/web/entrypoint.sh"]
 ```
 
 Here, we used a Docker [multi-stage build](https://docs.docker.com/develop/develop-images/multistage-build/) to reduce the final image size. Essentially, `builder` is a temporary image that's used for building the Python wheels. The wheels are then copied over to the final production image and the `builder` image is discarded.
@@ -628,18 +567,18 @@ Update the `web` service within the docker-compose.prod.yml file to build with _
 
 ```yaml
 web:
-    build: 
-        context: ./services/web
-        dockerfile: Dockerfile.prod
-    command: gunicorn --bind 0.0.0.0:5000 manage:app
-    ports: 
-        - 5000:5000
-    environment: 
-        - FLASK_APP=project/__init__.py
-        - FLASK_ENV=production
-        - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
-    depends_on: 
-        - db
+  build:
+    context: ./services/web
+    dockerfile: Dockerfile.prod
+  command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; gunicorn --bind 0.0.0.0:5000 manage:app'
+  ports:
+    - 5000:5000
+  environment:
+    - FLASK_APP=project/__init__.py
+    - FLASK_ENV=production
+    - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
+  depends_on:
+    - db
 ```
 
 Try it out:
@@ -647,6 +586,8 @@ Try it out:
 ```bash
 $ docker-compose -f docker-compose.prod.yml down -v
 $ docker-compose -f docker-compose.prod.yml up -d --build
+$ docker-compose -f docker-compose.prod.yml exec web python manage.py create_db
+$ docker-compose -f docker-compose.prod.yml exec web python manage.py seed_db
 ```
 
 ## Traefik
@@ -671,17 +612,36 @@ Next, let's add [Traefik](https://traefik.io/traefik/), a [reverse proxy](https:
   1. Slightly [faster](https://doc.traefik.io/traefik/v1.4/benchmarks/) than Traefik
   1. Use Nginx for complex services
 
-Add a new folder `traefik` to the services directory. The project structure should look like:
+Add a new folder called "traefik" to the "services" directory along with the following files:
+
+```bash
+traefik
+├── Dockerfile.traefik
+├── traefik.dev.toml
+└── traefik.prod.toml
+```
+
+Your project structure should now look like this:
 
 ```bash
 ├── docker-compose.prod.yml
 ├── docker-compose.yml
 └── services
     ├── traefik
+    │   ├── Dockerfile.traefik
+    │   ├── traefik.dev.toml
+    │   └── traefik.prod.toml
     └── web
+        ├── Dockerfile
+        ├── Dockerfile.prod
+        ├── manage.py
+        ├── project
+        │   ├── __init__.py
+        │   └── config.py
+        └── requirements.txt
 ```
 
-Add a new file called *traefik.dev.toml* to the "traefik" directory:
+Add the following to *traefik.dev.toml*:
 
 ```toml
 # listen on port 80
@@ -706,48 +666,49 @@ level = "DEBUG"
 
 Here, since we don't want to expose the `db` service, we set [exposedByDefault](https://doc.traefik.io/traefik/providers/docker/#exposedbydefault) to `false`. To manually expose a service we can add the `"traefik.enable=true"` label to the Docker Compose file.
 
-Next, update the _docker-compose.yml_ file so that our `web` service is discovered by Traefik and add a new `traefik` service:
+Next, update the *docker-compose.yml* file so that our `web` service is discovered by Traefik and add a new `traefik` service:
 
-```yml
+```yaml
 version: '3.8'
 
-services: 
-    web:
-        build: ./services/web
-        command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python manage.py run -h 0.0.0.0'
-        volumes: 
-            - ./services/web/:/app
-        ports: 
-            - 5000:5000
-        environment: 
-            - FLASK_APP=project/__init__.py
-            - FLASK_ENV=development 
-            - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev   
-        depends_on: 
-            - db
-        labels: 
-            - "traefik.enable=true"
-            - "traefik.http.routers.flask.rule=Host(`flask.localhost`)"
-            
-    db:
-        image: postgres:13-alpine
-        volumes: 
-            - postgres_data:/var/lib/postgresql/data/
-        environment: 
-            - POSTGRES_USER=hello_flask
-            - POSTGRES_PASSWORD=hello_flask
-            - POSTGRES_DB=hello_flask_dev
+services:
+  web:
+    build: ./services/web
+    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python manage.py run -h 0.0.0.0'
+    volumes:
+      - ./services/web/:/app
+    expose:  # new
+      - 5000
+    environment:
+      - FLASK_APP=project/__init__.py
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev
+    depends_on:
+      - db
+    labels:  # new
+      - "traefik.enable=true"
+      - "traefik.http.routers.flask.rule=Host(`flask.localhost`)"
 
-    traefik:
-        image: traefik:v2.2
-        ports: 
-            - 80:80
-        volumes:
-            - "./services/traefik/traefik.dev.toml:/etc/traefik/traefik.toml"
-            - "/var/run/docker.sock:/var/run/docker.sock:ro"        
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=hello_flask
+      - POSTGRES_PASSWORD=hello_flask
+      - POSTGRES_DB=hello_flask_dev
 
-volumes: 
-    postgres_data:
+  traefik:  # new
+    image: traefik:v2.2
+    ports:
+      - 80:80
+      - 8081:8080
+    volumes:
+      - "./services/traefik/traefik.dev.toml:/etc/traefik/traefik.toml"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+volumes:
+  postgres_data:
 ```
 
 First, the `web` service is only exposed to other containers on port `5000`. We also added the following labels to the `web` service:
@@ -757,20 +718,27 @@ First, the `web` service is only exposed to other containers on port `5000`. We 
 
 Take note of the volumes within the `traefik` service:
 
-1. `./traefik.dev.toml:/etc/traefik/traefik.toml` maps the local config file to the config file in the container so that the settings are kept in sync
-1. `/var/run/docker.sock:/var/run/docker.sock:ro` enables traefik to discover other containers
+1. `./services/traefik/traefik.dev.toml:/etc/traefik/traefik.toml` maps the local config file to the config file in the container so that the settings are kept in sync
+1. `/var/run/docker.sock:/var/run/docker.sock:ro` enables Traefik to discover other containers
 
 To test, first bring down any existing containers:
 
-```sh
+```bash
 $ docker-compose down -v
 $ docker-compose -f docker-compose.prod.yml down -v
 ```
 
 Build the new development images and spin up the containers:
 
-```sh
+```bash
 $ docker-compose up -d --build
+```
+
+Create the table and apply the seed:
+
+```bash
+$ docker-compose exec web python manage.py create_db
+$ docker-compose exec web python manage.py seed_db
 ```
 
 Navigate to [http://flask.localhost](http://flask.localhost). You should see:
@@ -796,10 +764,9 @@ You can test via cURL as well:
 $ curl -H Host:flask.localhost http://0.0.0.0
 ```
 
-Next, checkout the [dashboard](https://doc.traefik.io/traefik/operations/dashboard/) at [flask.localhost:8081](flask.localhost:8081):
+Next, checkout the [dashboard](https://doc.traefik.io/traefik/operations/dashboard/) at [http://flask.localhost:8081](http://flask.localhost:8081):
 
-
-![dashboard](dashboard)
+<img data-src="/static/images/blog/fastapi/fastapi-docker-traefik/traefik_dashboard.png"  loading="lazy" class="lazyload" style="max-width:100%" alt="traefik dashboard">
 
 Bring the containers and volumes down once done:
 
@@ -817,7 +784,7 @@ Since Let's Encrypt won't issue certificates for `localhost`, you'll need to spi
 
 Assuming you configured a compute instance and set up a free domain, you're now ready to set up Traefik in production mode.
 
-Start by adding a production version of the Traefik config to a file called *traefik.prod.toml*:
+Start by adding a production version of the Traefik config to *traefik.prod.toml*:
 
 ```toml
 [entryPoints]
@@ -882,56 +849,55 @@ Next, update *docker-compose.prod.yml* like so:
 ```yaml
 version: '3.8'
 
-services: 
-    web:
-        build: 
-            context: ./services/web
-            dockerfile: Dockerfile.prod
-        command: gunicorn --bind 0.0.0.0:5000 manage:app
-        expose: 
-            - 5000
-        environment: 
-            - FLASK_APP=project/__init__.py
-            - FLASK_ENV=production
-            - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
-        depends_on: 
-            - db
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.flask.rule=Host(`flask-traefik.your-domain.com`)"
-            - "traefik.http.routers.flask.tls=true"
-            - "traefik.http.routers.flask.tls.certresolver=letsencrypt"
-    db:
-        image: postgres:13-alpine
-        volumes: 
-            - postgres_data_prod:/var/lib/postgresql/data/
-        environment: 
-            - POSTGRES_USER=hello_flask
-            - POSTGRES_PASSWORD=hello_flask
-            - POSTGRES_DB=hello_flask_prod
-
-    traefik:
-        build:
-            context: ./services/traefik
-            dockerfile: Dockerfile.traefik
-        ports:
-            - 80:80
-            - 443:443
-        volumes:
-            - "/var/run/docker.sock:/var/run/docker.sock:ro"
-            - "./traefik-public-certificates:/certificates"
-        labels:
-            - "traefik.enable=true"
-            - "traefik.http.routers.dashboard.rule=Host(`dashboard-flask-traefik.your-domain.com`) && (PathPrefix(`/`)"
-            - "traefik.http.routers.dashboard.tls=true"
-            - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
-            - "traefik.http.routers.dashboard.service=api@internal"
-            - "traefik.http.routers.dashboard.middlewares=auth"
-            - "traefik.http.middlewares.auth.basicauth.users=testuser:$$apr1$$jIKW.bdS$$eKXe4Lxjgy/rH65wP1iQe1"
+services:
+  web:
+    build:
+      context: ./services/web
+      dockerfile: Dockerfile.prod
+    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; gunicorn --bind 0.0.0.0:5000 manage:app'
+    expose:  # new
+      - 5000
+    environment:
+      - FLASK_APP=project/__init__.py
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
+    depends_on:
+      - db
+    labels:  # new
+      - "traefik.enable=true"
+      - "traefik.http.routers.flask.rule=Host(`flask-traefik.your-domain.com`)"
+      - "traefik.http.routers.flask.tls=true"
+      - "traefik.http.routers.flask.tls.certresolver=letsencrypt"
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=hello_flask
+      - POSTGRES_PASSWORD=hello_flask
+      - POSTGRES_DB=hello_flask_prod
+  traefik:  # new
+    build:
+      context: ./services/traefik
+      dockerfile: Dockerfile.traefik
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./traefik-public-certificates:/certificates"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`dashboard-flask-traefik.your-domain.com`)"
+      - "traefik.http.routers.dashboard.tls=true"
+      - "traefik.http.routers.dashboard.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dashboard.service=api@internal"
+      - "traefik.http.routers.dashboard.middlewares=auth"
+      - "traefik.http.middlewares.auth.basicauth.users=testuser:$$apr1$$jIKW.bdS$$eKXe4Lxjgy/rH65wP1iQe1"
 
 volumes:
-    postgres_data_prod:
-    traefik-public-certificates:
+  postgres_data_prod:
+  traefik-public-certificates:
 ```
 
 > Again, make sure to replace `your-domain.com` with your actual domain.
@@ -956,7 +922,7 @@ As for the labels:
 
 You can create a new password hash using the htpasswd utility:
 
-```sh
+```bash
 # username: testuser
 # password: password
 
@@ -971,11 +937,9 @@ USERNAME=testuser
 HASHED_PASSWORD=$$apr1$$jIKW.bdS$$eKXe4Lxjgy/rH65wP1iQe1
 ```
 
-Finally, add a new Dockerfile called *Dockerfile.traefik*:
+Update *Dockerfile.traefik*:
 
 ```Dockerfile
-# Dockerfile.traefik
-
 FROM traefik:v2.2
 
 COPY ./traefik.prod.toml ./etc/traefik/traefik.toml
@@ -983,7 +947,7 @@ COPY ./traefik.prod.toml ./etc/traefik/traefik.toml
 
 Next, spin up the new container:
 
-```sh
+```bash
 $ docker-compose -f docker-compose.prod.yml up -d --build
 ```
 
@@ -1004,3 +968,5 @@ In terms of actual deployment to a production environment, you'll probably want 
 
 1. Fully-managed database service -- like [RDS](https://aws.amazon.com/rds/) or [Cloud SQL](https://cloud.google.com/sql/) -- rather than managing your own Postgres instance within a container.
 1. Non-root user for the services
+
+You can find the code in the [flask-docker-traefik](https://github.com/testdrivenio/flask-docker-traefik) repo.
