@@ -1,39 +1,40 @@
 version: '3.8'
 
-services: 
-    web:
-        build: ./services/web
-        command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python manage.py run -h 0.0.0.0'
-        volumes: 
-            - ./services/web/:/app
-        ports: 
-            - 5000:5000
-        environment: 
-            - FLASK_APP=project/__init__.py
-            - FLASK_ENV=development 
-            - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev   
-        depends_on: 
-            - db
-        labels: 
-            - "traefik.enable=true"
-            - "traefik.http.routers.flask.rule=Host(`flask.localhost`)"
-            
-    db:
-        image: postgres:13-alpine
-        volumes: 
-            - postgres_data:/var/lib/postgresql/data/
-        environment: 
-            - POSTGRES_USER=hello_flask
-            - POSTGRES_PASSWORD=hello_flask
-            - POSTGRES_DB=hello_flask_dev
+services:
+  web:
+    build: ./services/web
+    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; python manage.py run -h 0.0.0.0'
+    volumes:
+      - ./services/web/:/app
+    expose:
+      - 5000
+    environment:
+      - FLASK_APP=project/__init__.py
+      - FLASK_ENV=development
+      - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev
+    depends_on:
+      - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.flask.rule=Host(`flask.localhost`)"
 
-    traefik:
-        image: traefik:v2.2
-        ports: 
-            - 80:80
-        volumes:
-            - "./services/traefik/traefik.dev.toml:/etc/traefik/traefik.toml"
-            - "/var/run/docker.sock:/var/run/docker.sock:ro"        
+  db:
+    image: postgres:13-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=hello_flask
+      - POSTGRES_PASSWORD=hello_flask
+      - POSTGRES_DB=hello_flask_dev
 
-volumes: 
-    postgres_data:
+  traefik:
+    image: traefik:v2.2
+    ports:
+      - 80:80
+      - 8081:8080
+    volumes:
+      - "./services/traefik/traefik.dev.toml:/etc/traefik/traefik.toml"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+volumes:
+  postgres_data:
