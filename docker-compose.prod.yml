@@ -6,7 +6,7 @@ services:
       context: ./services/web
       dockerfile: Dockerfile.prod
     command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; gunicorn --bind 0.0.0.0:5000 manage:app'
-    expose:  # new
+    expose:
       - 5000
     environment:
       - FLASK_APP=project/__init__.py
@@ -14,20 +14,20 @@ services:
       - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_prod
     depends_on:
       - db
-    labels:  # new
+    labels:
       - "traefik.enable=true"
       - "traefik.http.routers.flask.rule=Host(`flask-traefik.michaelherman.io`)"
       - "traefik.http.routers.flask.tls=true"
       - "traefik.http.routers.flask.tls.certresolver=letsencrypt"
   db:
-    image: postgres:13-alpine
+    image: postgres:15-alpine
     volumes:
       - postgres_data_prod:/var/lib/postgresql/data/
     environment:
       - POSTGRES_USER=hello_flask
       - POSTGRES_PASSWORD=hello_flask
       - POSTGRES_DB=hello_flask_prod
-  traefik:  # new
+  traefik:
     build:
       context: ./services/traefik
       dockerfile: Dockerfile.traefik
