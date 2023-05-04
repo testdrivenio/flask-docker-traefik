@@ -2,7 +2,7 @@
 
 ## Want to learn how to build this?
 
-Check out the [post](https://testdriven.io/blog/flask-docker-traefik/).
+Check out the [tutorial](https://testdriven.io/blog/flask-docker-traefik/).
 
 ## Want to use this project?
 

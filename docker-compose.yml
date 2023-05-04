@@ -10,7 +10,7 @@ services:
       - 5000
     environment:
       - FLASK_APP=project/__init__.py
-      - FLASK_ENV=development
+      - FLASK_DEBUG=1
       - DATABASE_URL=postgresql://hello_flask:hello_flask@db:5432/hello_flask_dev
     depends_on:
       - db
@@ -19,7 +19,7 @@ services:
       - "traefik.http.routers.flask.rule=Host(`flask.localhost`)"
 
   db:
-    image: postgres:13-alpine
+    image: postgres:15-alpine
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
@@ -28,7 +28,7 @@ services:
       - POSTGRES_DB=hello_flask_dev
 
   traefik:
-    image: traefik:v2.2
+    image: traefik:v2.10
     ports:
       - 80:80
       - 8081:8080

@@ -20,7 +20,7 @@ dashboard = true
     exposedByDefault = false
 
 [certificatesResolvers.letsencrypt.acme]
-  email = "hermanmu@gmail.com"
+  email = "your@email.com"
   storage = "/certificates/acme.json"
   [certificatesResolvers.letsencrypt.acme.httpChallenge]
     entryPoint = "web"
